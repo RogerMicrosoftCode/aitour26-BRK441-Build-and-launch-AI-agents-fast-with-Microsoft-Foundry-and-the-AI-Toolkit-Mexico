@@ -1,6 +1,6 @@
 # Demo Instructions: Add Tools
 
-**Instructions**: Scroll down to the **Tools** section in the **Agent Builder**.
+**Instructions**: Switch to the v2 agent. Scroll down to the **Tools** section in the **Agent Builder**.
 
 **Script**: Back here in the Agent Builder, I can connect to Zava’s custom MCP server and add whichever tools will be relevant for Cora. Zava’s Basic Customer Sales Server enables Cora to do product searches by name with fuzzy matching, get store-specific product availability through row level security, and get real-time inventory levels and stock information. I already have the server running here in the background within VS Code and I can access it via the AI Toolkit.​
 
