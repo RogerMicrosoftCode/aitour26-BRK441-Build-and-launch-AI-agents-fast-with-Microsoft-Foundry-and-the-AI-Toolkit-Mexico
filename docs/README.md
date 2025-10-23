@@ -1,4 +1,4 @@
-# BRK441: Build and launch AI agents fast with GitHub Models and Azure AI Foundry
+# BRK441: Build and launch agents fast with Azure AI Foundry and the AI Toolkit
 
 This folder contains demo scripts and talking points for all demos within this session.
 
