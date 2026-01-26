@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first for better caching
 COPY src/python/requirements.txt .
 
-# Create wheels for all dependencies
-RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+# Create wheels for all dependencies (using --pre for agent-framework preview packages)
+RUN pip wheel --no-cache-dir --wheel-dir /wheels --pre -r requirements.txt
 
 # Production stage
 FROM python:3.11-slim

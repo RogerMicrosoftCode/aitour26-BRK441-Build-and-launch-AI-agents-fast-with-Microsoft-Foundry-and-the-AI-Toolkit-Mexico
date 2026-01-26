@@ -1,0 +1,67 @@
+{
+  "deploymentDate": "2026-01-26T06:53:00Z",
+  "resourceGroup": "AITourMx",
+  "location": "eastus2",
+  "subscriptionId": "662141d0-0308-4187-b46b-db1e9466b5ac",
+  "webapp": {
+    "name": "ca-webapp",
+    "url": "https://ca-webapp.agreeablemushroom-3ff8ea5f.eastus2.azurecontainerapps.io",
+    "image": "zavaagentacrmx.azurecr.io/zava-webapp:v6",
+    "status": "Running",
+    "framework": "agent-framework-azure-ai==1.0.0b260123"
+  },
+  "database": {
+    "name": "psql-zava-mx",
+    "host": "psql-zava-mx.postgres.database.azure.com",
+    "database": "zava",
+    "version": "16",
+    "sku": "Standard_B1ms",
+    "tier": "Burstable",
+    "extensions": ["vector"],
+    "dataRestored": true,
+    "tables": ["products", "customers", "orders", "order_items", "product_embeddings", "image_embeddings"]
+  },
+  "aiFoundry": {
+    "name": "foundry-zava-mx",
+    "endpoint": "https://foundry-zava-mx.services.ai.azure.com/",
+    "openaiEndpoint": "https://foundry-zava-mx.openai.azure.com/",
+    "modelDeployment": "gpt-4o-mini",
+    "modelVersion": "2024-07-18",
+    "sku": "GlobalStandard",
+    "capacity": 30
+  },
+  "resources": {
+    "containerAppsEnvironment": "cae-zava-agent-mx",
+    "containerRegistry": "zavaagentacrmx.azurecr.io",
+    "keyVault": "kv-zava-agent-mx",
+    "managedIdentity": "id-zava-agent",
+    "logAnalyticsWorkspace": "workspace-ourxRU3V",
+    "postgresqlServer": "psql-zava-mx",
+    "aiFoundry": "foundry-zava-mx",
+    "storageAccount": "stzavamx"
+  },
+  "security": {
+    "managedIdentityEnabled": true,
+    "keyVaultRbacEnabled": true,
+    "acrPullRoleAssigned": true,
+    "cognitiveServicesRoleAssigned": true,
+    "secretsInKeyVault": ["PostgresPassword", "PostgresConnectionString", "AZURE-AI-FOUNDRY-ENDPOINT"]
+  },
+  "environmentVariables": {
+    "AZURE_AI_FOUNDRY_ENDPOINT": "https://foundry-zava-mx.services.ai.azure.com/",
+    "AZURE_AI_MODEL_DEPLOYMENT_NAME": "gpt-4o-mini",
+    "POSTGRES_URL": "Configured via Key Vault reference"
+  },
+  "completedSteps": [
+    "✅ Container App deployed and running",
+    "✅ PostgreSQL database restored with production data",
+    "✅ Azure AI Foundry configured with gpt-4o-mini model",
+    "✅ Agent Framework initialized successfully",
+    "✅ Managed Identity with proper RBAC permissions"
+  ],
+  "nextSteps": [
+    "Configure custom domain (optional)",
+    "Set up monitoring alerts in Azure Monitor",
+    "Enable Application Insights for tracing"
+  ]
+}

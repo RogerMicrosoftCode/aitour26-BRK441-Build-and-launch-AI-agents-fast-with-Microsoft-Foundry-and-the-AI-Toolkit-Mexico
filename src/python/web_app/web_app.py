@@ -16,17 +16,19 @@ import uuid
 from pathlib import Path
 
 # Resolve shared asset paths relative to this file (web_app.py)
-BASE_SRC_DIR = Path(__file__).resolve().parents[2]  # -> /workspace/src
-SHARED_STATIC_DIR = BASE_SRC_DIR / "shared" / "static"
+# In container: /app/web_app/web_app.py -> parents[1] = /app
+BASE_APP_DIR = Path(__file__).resolve().parents[1]  # -> /app or /workspace/src/python
+SHARED_STATIC_DIR = BASE_APP_DIR / "shared" / "static"
 
 # Use shared/static when present; fall back to project-root static/templates
 STATIC_DIR = SHARED_STATIC_DIR if SHARED_STATIC_DIR.exists() else Path("static")
 TEMPLATES_DIR = STATIC_DIR if STATIC_DIR.exists() else Path("templates")
 
 # Agent Framework imports
-from agent_framework import ChatAgent, MCPStdioTool, ToolProtocol, ChatMessage, TextContent, DataContent
-from agent_framework.azure import AzureAIClient
-from azure.identity.aio import AzureCliCredential
+from agent_framework import ChatAgent, MCPStdioTool, ToolProtocol, ChatMessage, Content, Role
+from agent_framework.openai import OpenAIChatClient
+from openai import AsyncAzureOpenAI
+from azure.identity.aio import DefaultAzureCredential, get_bearer_token_provider
 
 
 from dotenv import load_dotenv
@@ -67,16 +69,31 @@ AGENT_NAME = "cora-web-agent"
 
 def create_mcp_tools() -> list[ToolProtocol]:
     """Create MCP tools for the agent"""
+    # Determine the correct path for MCP server based on environment
+    # In container: /app/mcp_server/customer_sales/customer_sales.py
+    # In development: src/python/mcp_server/customer_sales/customer_sales.py
+    mcp_script_path = Path("/app/mcp_server/customer_sales/customer_sales.py")
+    if not mcp_script_path.exists():
+        # Fallback for local development
+        mcp_script_path = Path("src/python/mcp_server/customer_sales/customer_sales.py")
+    
+    # Pass required environment variables to the MCP server subprocess
+    mcp_env = {
+        "POSTGRES_URL": os.environ.get("POSTGRES_URL", ""),
+        "PYTHONPATH": "/app/mcp_server/customer_sales",  # Add customer_sales to Python path for imports
+    }
+    
     return [
         MCPStdioTool(
             name="zava_customer_sales_stdio",
             description="MCP server for Zava customer sales analysis",
             command="python",
             args=[
-                "src/python/mcp_server/customer_sales/customer_sales.py",
+                str(mcp_script_path),
                 "--stdio",
                 "--RLS_USER_ID=00000000-0000-0000-0000-000000000000",
-            ]
+            ],
+            env=mcp_env,
         ),
     ]
 
@@ -114,31 +131,54 @@ If no matching products are found in Zava's catalog, say:
 "Thanks for sharing those details! I've searched our catalog, but it looks like we don't currently have a product that fits your exact needs. If you'd like, I can suggest some alternatives or help you adjust your project requirements to see if something similar might work."
 """
 
+# Get the managed identity client ID from environment
+AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID", "")
+
 async def initialize_agent():
-    """Initialize the Agent Framework agent using AzureAIClient"""
+    """Initialize the Agent Framework agent using OpenAIChatClient with Azure OpenAI"""
     global agent_instance, credential_instance
     if agent_instance is None:
         try:
-            # Use AzureCliCredential like cora-agent-demo.py
-            credential_instance = AzureCliCredential()
+            # Use ManagedIdentityCredential with the User-Assigned Managed Identity client_id
+            # If AZURE_CLIENT_ID is set, use it for user-assigned identity
+            if AZURE_CLIENT_ID:
+                from azure.identity.aio import ManagedIdentityCredential
+                credential_instance = ManagedIdentityCredential(client_id=AZURE_CLIENT_ID)
+                logger.info(f"Using User-Assigned Managed Identity with client_id: {AZURE_CLIENT_ID}")
+            else:
+                # Fall back to DefaultAzureCredential for local development
+                credential_instance = DefaultAzureCredential()
+                logger.info("Using DefaultAzureCredential")
             
-            # Create AzureAIClient for Foundry project endpoint
-            client = AzureAIClient(
-                project_endpoint=ENDPOINT,
-                model_deployment_name=MODEL_DEPLOYMENT_NAME,
-                async_credential=credential_instance,
-                agent_name=AGENT_NAME,
+            # Create bearer token provider for Azure OpenAI authentication
+            token_provider = get_bearer_token_provider(
+                credential_instance,
+                "https://cognitiveservices.azure.com/.default"
             )
             
-            # Create agent with the Azure AI client
-            agent_instance = client.create_agent(
+            # Create AsyncAzureOpenAI client
+            azure_client = AsyncAzureOpenAI(
+                azure_endpoint=ENDPOINT,
+                azure_ad_token_provider=token_provider,
+                api_version="2024-10-21",
+            )
+            
+            # Create OpenAIChatClient with the Azure client
+            chat_client = OpenAIChatClient(
+                model_id=MODEL_DEPLOYMENT_NAME,
+                async_client=azure_client,
+            )
+            
+            # Create agent with the chat client
+            agent_instance = ChatAgent(
                 name=AGENT_NAME,
                 instructions=AGENT_INSTRUCTIONS,
+                chat_client=chat_client,
                 tools=[
                     *create_mcp_tools(),
                 ],
             )
-            logger.info("Agent Framework initialized successfully with AzureAIClient")
+            logger.info("Agent Framework initialized successfully with OpenAIChatClient for Azure OpenAI")
         except Exception as e:
             logger.error(f"Failed to initialize Agent Framework: {e}")
             import traceback
@@ -272,14 +312,14 @@ async def simulate_ai_agent(user_message: str, image_url: Optional[str] = None, 
                     
                     logger.info(f"Image loaded: {len(image_bytes)} bytes, MIME type: {mime_type}")
                     
-                    # Create a ChatMessage with multimodal content using DataContent
+                    # Create a ChatMessage with multimodal content using Content
                     # Note: use 'contents' (plural) not 'content'
                     message_with_image = [
                         ChatMessage(
-                            role="user",
+                            role=Role.USER,
                             contents=[
-                                TextContent(text=user_message),
-                                DataContent(data=image_bytes, media_type=mime_type)
+                                Content.from_text(text=user_message),
+                                Content.from_data(data=image_bytes, media_type=mime_type)
                             ]
                         )
                     ]
