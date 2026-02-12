@@ -367,5 +367,108 @@ Usuario (Bruno)
 
 ---
 
+## Apéndice A: Demo de Conectividad MCP
+
+### Propósito
+Esta demo demuestra que el servidor MCP está funcionando correctamente antes de usarlo con el Agent Builder.
+
+### Prerequisitos
+1. Python 3.10+ instalado
+2. Dependencias instaladas: `pip install -r src/python/requirements.txt`
+3. Terminal en VS Code abierta
+
+### Opción 1: Demo Automatizada (Recomendada)
+
+```powershell
+# Navegar al directorio del servidor MCP
+cd src/python/mcp_server
+
+# Ejecutar demo completa (inicia servidor automáticamente)
+.\demo_mcp.ps1 -StartServer
+```
+
+**Resultado esperado:**
+```
+================================================================
+  🎯 DEMO MCP CONNECTIVITY - Zava Retail
+================================================================
+
+🔌 TEST 1: Verificación de Puerto
+   ✅ Servidor escuchando en 127.0.0.1:8000
+
+🌐 TEST 2: Verificación de Endpoint HTTP
+   ✅ Endpoint respondiendo
+   📊 Status Code: 200
+   📋 Content-Type: text/event-stream
+
+📡 TEST 3: Verificación de Protocolo JSON-RPC
+   ✅ Servidor responde con JSON-RPC válido
+
+🚀 TEST 4: Protocolo MCP Streamable HTTP
+   ✅ Protocolo MCP Streamable HTTP activo!
+
+================================================================
+📊 RESUMEN DE LA DEMOSTRACIÓN
+================================================================
+🎉 RESULTADO: ¡TODOS LOS TESTS PASARON!
+✅ El servidor MCP está funcionando correctamente
+✅ Listo para usar con el Agent Builder
+================================================================
+```
+
+### Opción 2: Demo Manual Paso a Paso
+
+#### Paso 1: Iniciar el Servidor MCP
+```powershell
+# Terminal 1: Iniciar servidor
+cd src/python/mcp_server/sales_analysis
+python sales_analysis.py
+```
+
+Deberías ver:
+```
+📡 MCP endpoint available at: http://127.0.0.1:8000/mcp
+```
+
+#### Paso 2: Ejecutar Prueba de Conectividad
+```powershell
+# Terminal 2: Ejecutar prueba
+cd src/python/mcp_server
+python demo_mcp_connectivity.py
+```
+
+### Opción 3: Test Rápido con PowerShell
+
+```powershell
+# Test rápido sin scripts
+cd src/python/mcp_server
+.\demo_mcp.ps1 -TestOnly
+```
+
+### Comandos Útiles Durante la Demo
+
+| Comando | Descripción |
+|---------|-------------|
+| `.\demo_mcp.ps1 -StartServer` | Inicia servidor + demo completa |
+| `.\demo_mcp.ps1 -TestOnly` | Solo verificación rápida |
+| `.\demo_mcp.ps1 -Help` | Muestra ayuda |
+| `python demo_mcp_connectivity.py` | Demo Python detallada |
+
+### Troubleshooting
+
+| Problema | Solución |
+|----------|----------|
+| Puerto 8000 ocupado | `Stop-Process -Name python -Force` |
+| ModuleNotFoundError | `pip install -r src/python/requirements.txt` |
+| Servidor no responde | Verificar que PostgreSQL esté corriendo |
+
+### Archivos de Demo
+
+- `src/python/mcp_server/demo_mcp.ps1` - Script PowerShell automatizado
+- `src/python/mcp_server/demo_mcp_connectivity.py` - Prueba Python detallada
+- `src/python/mcp_server/sales_analysis/sales_analysis.py` - Servidor MCP
+
+---
+
 *Guion adaptado para AI Tour México - Febrero 2026*
 *Demostración: Construye y lanza agentes de IA rápidamente con Microsoft Foundry y el AI Toolkit*
