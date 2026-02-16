@@ -470,5 +470,207 @@ cd src/python/mcp_server
 
 ---
 
+## Apéndice B: Demo de Integración Completa (Frontend + Agente + BD)
+
+### Propósito
+Esta demo muestra cómo se integran todos los componentes de la aplicación Cora:
+- Frontend (Web App)
+- Agente (Microsoft Agent Framework)
+- Base de Datos (PostgreSQL)
+- Despliegue a Azure
+
+### Prerequisitos
+1. Docker Desktop instalado
+2. Python 3.10+ con dependencias instaladas
+3. Cuenta de Azure (para despliegue)
+
+### Demo 1: Integración Local
+
+```powershell
+# Navegar al directorio de tests
+cd src/python/tests
+
+# Ejecutar demo end-to-end
+python demo_end_to_end.py --mode local
+```
+
+**Lo que muestra:**
+- Arquitectura de integración visual
+- Conectividad a PostgreSQL
+- Integración MCP → Base de datos
+- Estado del Web App
+- Flujo de solicitudes del usuario
+
+### Demo 2: Verificación de Despliegue Azure
+
+```powershell
+# Ver información de arquitectura de despliegue
+.\scripts\demo-deploy-azure.ps1 -Action info
+
+# Verificar recursos desplegados
+.\scripts\demo-deploy-azure.ps1 -Action verify -ResourceGroup AITourMexFeb
+```
+
+### Demo 3: Prueba de Integración Automatizada
+
+```powershell
+# Ejecutar suite completa de pruebas
+cd src/python/tests
+python test_integration.py
+```
+
+**Resultados esperados:**
+```
+[Paso 1] Probando conexión a PostgreSQL...
+✅ PostgreSQL conectado
+
+[Paso 2] Ejecutando consultas de prueba...
+✅ Productos encontrados: 150
+✅ Total de clientes: 5000
+
+[Paso 3] Verificando estado del Web App...
+✅ Web App saludable
+
+[Paso 4] Verificando frontend...
+✅ Frontend HTML cargado correctamente
+
+[Paso 5] Probando búsqueda de productos...
+✅ Integración MCP → PostgreSQL funcionando
+
+Total: 5/5 pruebas pasadas
+```
+
+### Arquitectura de Integración
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        ARQUITECTURA DE INTEGRACIÓN                       │
+├─────────────────────────────────────────────────────────────────────────┤
+
+    👤 Usuario (Bruno)
+          │
+          │ HTTP/WebSocket
+          ▼
+    ┌─────────────────────┐
+    │   FRONTEND (Web)    │  ◄── index.html + CSS/JS
+    │   Puerto: 8000      │
+    │   FastAPI + Jinja2  │
+    └──────────┬──────────┘
+               │
+               │ HTTP POST / WebSocket
+               ▼
+    ┌─────────────────────┐
+    │   AGENTE (Cora)     │  ◄── Microsoft Agent Framework
+    │   ChatAgent         │
+    │   + OpenAIChatClient│
+    └──────────┬──────────┘
+               │
+       ┌───────┴───────┐
+       │               │
+       ▼               ▼
+┌───────────┐  ┌───────────────┐
+│ Azure AI  │  │   MCP Tools   │
+│GPT-4o-mini│  │ (stdio mode)  │
+└───────────┘  └───────┬───────┘
+                       │
+                       │ SQL Queries
+                       ▼
+              ┌───────────────┐
+              │  PostgreSQL   │  ◄── Schema: retail
+              │  + pgvector   │
+              └───────────────┘
+
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Flujo de Una Solicitud
+
+1. Bruno abre `http://localhost:8000` y envía "Busco una pintura eggshell"
+2. WebSocket envía mensaje al Web App (FastAPI)
+3. ChatAgent (Cora) recibe el mensaje y decide usar herramienta
+4. MCP Tool `get_products_by_name` se invoca via stdio
+5. PostgreSQL ejecuta: `SELECT * FROM retail.products WHERE name ILIKE '%eggshell%'`
+6. Resultado regresa por la cadena hasta Bruno con recomendación personalizada
+
+### Comandos de Despliegue Repetible
+
+```powershell
+# PASO 1: Login en Azure
+az login
+
+# PASO 2: Desplegar infraestructura
+az deployment sub create \
+    --location eastus2 \
+    --template-file infra/main.bicep \
+    --parameters resourcePrefix=zava-demo
+
+# PASO 3: Construir y subir imagen
+az acr login --name zavaacr
+docker build -t zavaacr.azurecr.io/zava-webapp:latest -f Dockerfile.webapp .
+docker push zavaacr.azurecr.io/zava-webapp:latest
+
+# PASO 4: Actualizar Container App
+az containerapp update \
+    --name ca-webapp \
+    --resource-group rg-zava-demo \
+    --image zavaacr.azurecr.io/zava-webapp:latest
+
+# PASO 5: Verificar
+.\scripts\demo-deploy-azure.ps1 -Action verify
+```
+
+### Archivos de Demo de Integración
+
+| Archivo | Propósito |
+|---------|-----------|
+| `src/python/tests/demo_frontend_agent_query.py` | **Demo principal: Frontend + Agente + Query** |
+| `src/python/tests/demo_end_to_end.py` | Demo completa de integración |
+| `src/python/tests/test_integration.py` | Pruebas automatizadas |
+| `src/python/tests/demo_database_connectivity.py` | Demo de conectividad BD |
+| `scripts/demo-deploy-azure.ps1` | Script de despliegue Azure |
+
+### Demo Rápida: Frontend + Agente + Consulta
+
+Esta es la demo más importante para mostrar la integración:
+
+```powershell
+cd src/python/tests
+python demo_frontend_agent_query.py
+```
+
+**Lo que muestra:**
+- Arquitectura visual de componentes
+- Flujo paso a paso de una consulta (10 pasos)
+- Query real a PostgreSQL
+- Respuesta del agente con productos
+- Código de integración explicado
+
+**Ejemplo de salida:**
+```
+  Bruno dice:
+  "Busco una pintura eggshell para mi sala de estar"
+
+--- Procesando consulta ---
+
+  [1] Usuario -> Envía mensaje al chat
+  [2] Frontend -> Recibe via WebSocket
+  [3] WebSocket -> FastAPI procesa mensaje
+  [4] Agente -> ChatAgent (Cora) analiza intent
+  [5] Agente -> Decide usar MCP Tool
+  [6] MCP Tool -> Invoca via stdio
+  [7] PostgreSQL -> Ejecuta query
+  [8] PostgreSQL -> Retorna resultados (3 productos)
+  [9] Agente -> Genera respuesta personalizada
+  [10] Frontend -> Muestra respuesta en chat UI
+
+  Cora responde:
+  
+  1. Interior Eggshell Paint - White
+     Precio: $65.67
+     Categoría: Painting
+```
+
+---
+
 *Guion adaptado para AI Tour México - Febrero 2026*
 *Demostración: Construye y lanza agentes de IA rápidamente con Microsoft Foundry y el AI Toolkit*
